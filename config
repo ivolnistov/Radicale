@@ -70,9 +70,14 @@
 [auth]
 
 # Authentication method
-# Value: none | htpasswd | remote_user | http_x_remote_user
+# Value: none | htpasswd | remote_user | http_x_remote_user | imap | mixed
 #type = none
+#types = htpasswd
 
+#imap_host = localhost
+#imap_port = 993
+#imap_tls = False
+#imap_cram_md5 = False
 # Htpasswd filename
 #htpasswd_filename = /etc/radicale/users
 

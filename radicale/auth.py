@@ -56,17 +56,18 @@ following significantly more secure schemes are parsable by Radicale:
 import base64
 import functools
 import hashlib
+import imaplib
 import hmac
 import os
 from importlib import import_module
 
-INTERNAL_TYPES = ("None", "none", "remote_user", "http_x_remote_user",
-                  "htpasswd")
+INTERNAL_TYPES = ("None", "none", "remote_user", "http_x_remote_user", "htpasswd", "imap", "mixed")
 
 
-def load(configuration, logger):
+def load(configuration, logger, auth_type=None):
     """Load the authentication manager chosen in configuration."""
-    auth_type = configuration.get("auth", "type")
+    if not auth_type:
+        auth_type = configuration.get("auth", "type")
     if auth_type in ("None", "none"):  # DEPRECATED: use "none"
         class_ = NoneAuth
     elif auth_type == "remote_user":
@@ -75,6 +76,10 @@ def load(configuration, logger):
         class_ = HttpXRemoteUserAuth
     elif auth_type == "htpasswd":
         class_ = Auth
+    elif auth_type == "imap":
+        class_ = ImapAuth
+    elif auth_type == "mixed":
+        class_ = MixedAuth
     else:
         try:
             class_ = import_module(auth_type).Auth
@@ -261,6 +266,49 @@ class Auth(BaseAuth):
         except OSError as e:
             raise RuntimeError("Failed to load htpasswd file %r: %s" %
                                (self.filename, e)) from e
+        return False
+
+
+class ImapAuth(BaseAuth):
+    def __init__(self, configuration, logger):
+        super().__init__(configuration, logger)
+        self.imap_host = configuration.get("auth", "imap_host")
+        self.imap_port = configuration.get("auth", "imap_port")
+        self.imap_tls = configuration.get("auth", "imap_tls")
+        self.imap_cram_md5 = configuration.get("auth", "imap_cram_md5")
+
+    def is_authenticated(self, user, password):
+        """Validate credentials on imap server.
+        """
+        self.logger.debug('connecting to %s:%s', self.imap_host, self.imap_port)
+        imap = imaplib.IMAP4_SSL(self.imap_host, self.imap_port) if self.imap_tls else imaplib.IMAP4(self.imap_host,
+                                                                                                     self.imap_port)
+        try:
+            if not self.imap_cram_md5:
+                status, message = imap.login(user, password)
+                imap.logout()
+                return status == 'OK'
+            else:
+                status, message = imap.login(user, password)
+                imap.logout()
+                return status == 'OK'
+        except imaplib.IMAP4.error as e:
+            self.logger.error('Authentication Failed: {0}'.format(e))
+            return False
+        except Exception as e:
+            raise RuntimeError("Error: {0}".format(e))
+
+
+class MixedAuth(BaseAuth):
+    def __init__(self, configuration, logger):
+        super().__init__(configuration, logger)
+        self.auth_types = configuration.get("auth", "types")
+
+    def is_authenticated(self, user, password):
+        for auth_type in self.auth_types.split(','):
+            _cls = load(self.configuration, self.logger, auth_type=auth_type)
+            if _cls.is_authenticated(user, password):
+                return True
         return False
 
 

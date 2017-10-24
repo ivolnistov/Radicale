@@ -140,6 +140,26 @@ INITIAL_CONFIG = OrderedDict([
             "value": "bcrypt",
             "help": "htpasswd encryption method",
             "type": str}),
+        ("types", {
+            "value": "none",
+            "help": "types for mixed auth",
+            "type": str}),
+        ("imap_host", {
+            "value": "localhost",
+            "help": "imap host",
+            "type": str}),
+        ("imap_port", {
+            "value": "993",
+            "help": "imap port",
+            "type": str}),
+        ("imap_tls", {
+            "value": "False",
+            "help": "use tls for imap connection",
+            "type": bool}),
+        ("imap_cram_md5", {
+            "value": "False",
+            "help": "user cram md5 authentication method",
+            "type": bool}),
         ("delay", {
             "value": "1",
             "help": "incorrect authentication delay",
